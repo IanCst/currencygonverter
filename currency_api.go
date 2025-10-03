@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 )
@@ -30,6 +31,9 @@ type CurrencyData struct {
 }
 
 func fetchCurrencyRates() (*CurrencyData, error) {
+	// Record the request time
+	requestTime := time.Now()
+	
 	// Create HTTP client with timeout
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -74,6 +78,19 @@ func fetchCurrencyRates() (*CurrencyData, error) {
 
 	if brl, exists := currencyResp.Data["BRL"]; exists {
 		currencyData.BRL = brl.Value
+	}
+
+	// Save to database (ignore errors to not break the main functionality)
+	if currencyData.USD > 0 && currencyData.BRL > 0 {
+		log.Printf("Attempting to save currency data: USD=%.6f, BRL=%.6f", currencyData.USD, currencyData.BRL)
+		if err := SaveCurrencyRate(requestTime, currencyData.BRL, currencyData.USD); err != nil {
+			// Log the error but don't fail the main operation
+			log.Printf("Warning: Failed to save currency data to database: %v", err)
+		} else {
+			log.Println("Currency data saved to database successfully")
+		}
+	} else {
+		log.Printf("Skipping database save - invalid currency data: USD=%.6f, BRL=%.6f", currencyData.USD, currencyData.BRL)
 	}
 
 	return currencyData, nil
